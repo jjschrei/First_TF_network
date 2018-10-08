@@ -5,6 +5,8 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import csv
+from scipy import stats
+
 # From Table S13 in Plaisier et al., Cell Systems 2016
 # These are Entrez IDs (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3013746/)
 input = ['430', '1052', '1053', '1385', '84699', '9586', '1871', '1874', '144455', '79733', '1960', '1997', '2002', '2004', '80712', '2114', '2115', '2120', '51513', '2551', '2623', '2624', '2625', '9421', '3232', '10320', '3659', '3662', '3670', '91464', '3726', '10661', '11278', '128209', '10365', '9314', '1316', '51176', '9935', '23269', '4602', '4774', '4790', '7025', '9480', '5468', '5914', '5916', '3516', '5971', '864', '6257', '4093', '6659', '6660', '6662', '25803', '347853', '30009', '9496', '6929', '6925', '8463', '7022', '29842', '10155', '6935', '132625', '23051', '85416', '7707', '7764', '23528', '201516']
@@ -38,11 +40,12 @@ with open('id_conversion/humanTFs_All.CSV','r') as inFile:
     # Use the readline() function to read in a single line
     # strip() gets rid of the newline character at the end of the line
     # split(',') splits up the line into columns based on commas
+    # Tried using pandas,but dict conversion was more ocmplex and intensive than current code
     header = inFile.readline().strip().split(',')
     print(header)
-#   reader = csv.reader(inFile)
-#   id2motif = dict((rows[3],rows[1]) for rows in inFile)
-#    id2motif = Entrez ID:Motif Name for Entrez ID,Motif name in HumanTfs 
+
+    
+    #id2motif = Entrez ID:Motif Name for Entrez ID,Motif name in HumanTfs 
     while 1:
         inLine = inFile.readline()
         if not inLine:
@@ -74,8 +77,8 @@ with open('id_conversion/tfFamilies.csv','r', encoding='iso-8859-1') as openFile
             Id2Family[IdList] = strip[0]
 
             
-print (Id2Family.keys())        
-print (Family2Id.values())
+#print (Id2Family.keys())        
+#print (Family2Id.values())
 
 ## To build a TF regulator to TF target gene network (constrained to TFs within the input list).
 ## This will require mapping from:
@@ -86,36 +89,35 @@ print (Family2Id.values())
 ##     5. Add new entry to tfNetwor dictionary that has as the key the TF regulator and the values all the TF target genes
 tfNetwork = {}
 TFRegulator={}
-for eachTfReg in input:    # for loop that assigns each iteration to eachTfReg
-    if eachTfReg in id2motif:
-        for eachMotif in id2motif[eachTfReg]:    # loop function that checks motif2id in id2motif[eachTfReg]
-            if eachMotif in tfbsDb:
-                targets = tfbsDb[eachMotif]          # assign targets from id2motif[eachTfReg]/eachTfreg
-                for eachTarget in targets:
-                    if not eachTfReg in tfNetwork:
-                        tfNetwork[eachTfReg] = []
-                    if eachTarget in input and not eachTarget in tfNetwork[eachTfReg]:
-                        tfNetwork[eachTfReg].append(eachTarget)
+for TranscriptionFactors in input:    # for loop iterates for each entrez id given in the input list
+    if TranscriptionFactors in id2motif:    # if the transcription factors (entrez ids) are located in the id2motif dict
+        for Motif in id2motif[TranscriptionFactors]:    # loop function that checks each motif that corresponds to entrez id in input list
+            if Motif in tfbsDb: # checks the JSON file for the determined motifs
+                targets = tfbsDb[Motif]          # assign targets based on the entrez ids that correspond to the motifs
+                for eachTarget in targets:  # loop iterates for each target identified
+                    if not TranscriptionFactors in tfNetwork: 
+                        tfNetwork[TranscriptionFactors] = []
+                    if eachTarget in input and not eachTarget in tfNetwork[TranscriptionFactors]:
+                        tfNetwork[TranscriptionFactors].append(eachTarget)
     else:
-        for eachFamily in Family2Id:
-            if eachTfReg in Family2Id[eachFamily]:
-                for eachId in Family2Id[eachFamily]:
-                    if eachId in id2motif:
-                        for eachMotif in id2motif[eachId]:    # loop function that checks motif2id in id2motif[eachTfReg]
-                            if eachMotif in tfbsDb:
-                                targets = tfbsDb[eachMotif]          # assign targets from id2motif[eachTfReg]/eachTfreg
-                                for eachTarget in targets:
-                                    if not eachTfReg in tfNetwork:
-                                        tfNetwork[eachTfReg] = []
-                                    if eachTarget in input and not eachTarget in tfNetwork[eachTfReg]:
-                                        tfNetwork[eachTfReg].append(eachTarget)
+        for TFFamilies in Family2Id: # for loop iterates for every family in tf families
+            if TranscriptionFactors in Family2Id[TFFamilies]: #if there is a desired input entrez id in the family list
+                for Id in Family2Id[TFFamilies]:    # for each id in the family list
+                    if Id in id2motif: #check for id in id2motif
+                        for Motifs in id2motif[Id]:    # loop function that checks motif2id in id2motif[eachTfReg]
+                            if Motifs in tfbsDb:    # checks for motifs in JSON file
+                                targets = tfbsDb[Motifs]          # assign targets from id2motif[eachTfReg]/eachTfreg
+                                for eachTarget in targets:  #loop iterates for each target identified
+                                    if not TranscriptionFactors in tfNetwork:
+                                        tfNetwork[TranscriptionFactors] = []
+                                    if eachTarget in input and not eachTarget in tfNetwork[TranscriptionFactors]:
+                                        tfNetwork[TranscriptionFactors].append(eachTarget)
 
 netConnections = []
 for TFreg in tfNetwork:
     for TFtarg in tfNetwork[TFreg]:
         netConnections.append((TFreg,TFtarg))
 
-        
 #print(netConnections)
 
 G = nx.DiGraph()
@@ -127,3 +129,32 @@ nx.draw_networkx_labels(G, pos)
 nx.draw_networkx_edges(G, pos)
 plt.show()
 
+
+
+#Using net connections
+#Each link corresponds to 2 entrez id
+#use those links and compare with expression data
+TFcorrelation = []
+TFcorrelation = pd.read_csv('tfExp.CSV', delimiter=',', index_col = 0)
+Connections = pd.DataFrame({'col':netConnections})
+
+#with open('tfExp.CSV','r') as inFile3:
+#    header = inFile3.readline().strip().split(',')
+#    while 1:
+#        inLine3 = inFile3.readline()
+#        if not inLine3:
+#            break
+#        strip = inLine3.strip().split(',')
+#        strip2 = strip[2].split(' ')
+#        TFcorrelation[strip[0]] = strip2
+#        
+#        if not split[2] in TFcorrelation:
+#            TFcorrelation[split[2]] = []
+#        TFcorrelation[split[2]].append(split[0])
+
+netConstruct = dict(netConnections)
+SigConnection = []
+pval = []
+for iteration in netConnections:
+    pval = stats.pearsonr[TFcorrelation[int(iteration[0])],TFcorrelation[int(iteration[1])]]
+    SigConnection[iteration].append(pval)
